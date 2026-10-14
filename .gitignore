@@ -1,0 +1,8 @@
+.theos/
+packages/
+*.deb
+NeoIsland-source.zip
+*.zip
+artifacts/
+.DS_Store
+__pycache__/

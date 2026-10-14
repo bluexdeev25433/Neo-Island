@@ -1,0 +1,116 @@
+name: Build and package
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.scheme }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        scheme: [rootful, rootless]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install actionlint
+        run: |
+          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang fakeroot rsync curl perl zip git libxml2-dev libtinfo6 xz-utils dpkg-dev
+
+      - name: Run tests
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+          git diff --check
+          actionlint .github/workflows/build.yml
+
+      - name: Install Theos, iOS SDK, cross compiler, and ldid
+        env:
+          THEOS: ${{ runner.temp }}/theos
+        run: |
+          git clone --depth=1 --recursive https://github.com/theos/theos.git "$THEOS"
+          "$THEOS/bin/install-sdk" iPhoneOS16.5
+          curl -fsSL https://github.com/L1ghtmann/llvm-project/releases/download/main-update_3-eabca92/iOSToolchain-x86_64.tar.xz \
+            | tar -xJf - -C "$THEOS/toolchain"
+          curl -fsSL -o "$RUNNER_TEMP/ldid" \
+            https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_linux_x86_64
+          chmod 755 "$RUNNER_TEMP/ldid"
+          echo "$THEOS/toolchain/linux/iphone/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Build package
+        env:
+          THEOS: ${{ runner.temp }}/theos
+        run: |
+          umask 022
+          set -o pipefail
+          if [[ "${{ matrix.scheme }}" == "rootless" ]]; then
+            make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless 2>&1 | tee build.log
+          else
+            make clean package FINALPACKAGE=1 2>&1 | tee build.log
+          fi
+
+      - name: Validate package metadata and contents
+        env:
+          THEOS: ${{ runner.temp }}/theos
+        run: |
+          set -euo pipefail
+          package=$(find packages -maxdepth 1 -type f -name '*.deb' -print -quit)
+          test -n "$package"
+          dpkg-deb -f "$package" Package Version Architecture Depends
+          dpkg-deb -c "$package" | tee package-contents.txt
+          test "$(dpkg-deb -f "$package" Package)" = "com.neoisland.tweak"
+          test "$(dpkg-deb -f "$package" Version)" = "1.1.0"
+          if [[ "${{ matrix.scheme }}" == "rootless" ]]; then
+            expected_arch=iphoneos-arm64
+          else
+            expected_arch=iphoneos-arm
+          fi
+          test "$(dpkg-deb -f "$package" Architecture)" = "$expected_arch"
+          extract=$(mktemp -d)
+          dpkg-deb -x "$package" "$extract"
+          if [[ "${{ matrix.scheme }}" == "rootless" ]]; then
+            prefix="$extract/var/jb"
+          else
+            prefix="$extract"
+          fi
+          test -f "$prefix/Library/MobileSubstrate/DynamicLibraries/NeoIsland.dylib"
+          test -f "$prefix/Library/MobileSubstrate/DynamicLibraries/NeoIsland.plist"
+          test -f "$prefix/Library/PreferenceBundles/NeoIslandPrefs.bundle/NeoIslandPrefs"
+          test -f "$prefix/Library/PreferenceLoader/Preferences/com.neoisland.preferences.plist"
+          "$THEOS/toolchain/linux/iphone/bin/llvm-lipo" -info "$prefix/Library/MobileSubstrate/DynamicLibraries/NeoIsland.dylib" | tee binary-architectures.txt
+          grep -q arm64 binary-architectures.txt
+          grep -q arm64e binary-architectures.txt
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neo-island-${{ matrix.scheme }}-logs
+          path: |
+            build.log
+            package-contents.txt
+            binary-architectures.txt
+          if-no-files-found: ignore
+
+      - name: Upload Debian package
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neo-island-${{ matrix.scheme }}-deb
+          path: packages/*.deb
+          if-no-files-found: error

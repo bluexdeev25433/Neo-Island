@@ -1,0 +1,9 @@
+Package: com.neoisland.tweak
+Name: Neo Island
+Version: 1.1.0
+Architecture: iphoneos-arm
+Description: Configurable Dynamic Island-style overlay for selected iPhones.
+Maintainer: Neo Island
+Author: Neo Island
+Section: Tweaks
+Depends: mobilesubstrate | ellekit, firmware (>= 15.0), preferenceloader

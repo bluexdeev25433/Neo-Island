@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Neo Island mark</title>
+  <rect x="8" y="31" width="112" height="66" rx="33" fill="#101a19"/>
+  <path d="M32 66h12l7-15 12 29 9-20 7 11h17" fill="none" stroke="#d6fb69" stroke-linecap="round" stroke-linejoin="round" stroke-width="6"/>
+  <circle cx="101" cy="47" r="5" fill="#fc7b64"/>
+</svg>
