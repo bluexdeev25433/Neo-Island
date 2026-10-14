@@ -26,9 +26,16 @@ Phiên bản mã nguồn hiện đặt mục tiêu iOS 15.0 trở lên. Một s�
 | Rootless | Build/package đã xác minh trong container Ubuntu; chưa cài trên thiết bị |
 | iOS 15 trở lên | Mức phiên bản mục tiêu; chưa xác minh tương thích thực tế theo từng phiên bản |
 
-Release `v1.0.1` có gói Rootful và Rootless đã được build/kiểm tra cấu trúc trong CI. Các thay đổi source `1.1.0` chưa phải package phát hành cho tới khi workflow release build và kiểm tra xong. Không package nào được cài hoặc kiểm thử trên iPhone.
+Release `v1.1.0` đã được publish với gói Rootful, Rootless, source archive và SHA-256. CI đã build và kiểm tra metadata, install paths cùng arm64/arm64e. Các gói chưa được cài hoặc kiểm thử runtime trên iPhone.
 
-Phiên bản source đang phát triển là `1.1.0`. Bản này bổ sung state manager cho chế độ hiển thị, cập nhật volume theo sự kiện, khôi phục trạng thái timer khi ứng dụng hoạt động lại và nhận diện một số tuyến âm thanh ngoài. Việc kiểm thử runtime trên iPhone vẫn chưa thực hiện.
+Phiên bản mới nhất là `1.1.0`. Bản này bổ sung state manager cho chế độ hiển thị, cập nhật volume theo sự kiện, khôi phục trạng thái timer khi ứng dụng hoạt động lại và nhận diện một số tuyến âm thanh ngoài. Việc kiểm thử runtime trên iPhone vẫn chưa thực hiện.
+
+## Website và Sileo
+
+- Website: [Neo Island](https://bluexdeev25433.github.io/Neo-Island/).
+- Sileo/APT source: `https://bluexdeev25433.github.io/Neo-Island/repo/`.
+- [GitHub Release v1.1.0](https://github.com/bluexdeev25433/Neo-Island/releases/tag/v1.1.0) có hai gói cài đặt, source archive và SHA-256.
+- APT `Release` và hai architecture indexes đã được đọc bằng `apt-get`; chưa thử add source trực tiếp trong ứng dụng Sileo.
 
 ## Trước khi cài đặt
 
@@ -151,6 +158,8 @@ Dự án sử dụng giấy phép MIT theo tệp [LICENSE](LICENSE). Tệp giấ
 ## Phiên bản và hỗ trợ
 
 - Phiên bản source: **1.1.0**.
+- Website: **https://bluexdeev25433.github.io/Neo-Island/**. Sileo source: **https://bluexdeev25433.github.io/Neo-Island/repo/**.
+- Release: [Neo Island v1.1.0](https://github.com/bluexdeev25433/Neo-Island/releases/tag/v1.1.0), gồm Rootful/Rootless `.deb`, source ZIP và SHA-256.
 - Nhật ký thay đổi: **1.1.0** — tách quản lý trạng thái khỏi renderer, thêm các mode compact/expanded/minimal/activity/notification, chuyển lựa chọn module sang định danh ổn định, thêm material và kích thước theo mode, làm mới volume theo sự kiện, khôi phục timer theo sự kiện foreground/đổi giờ và nhận diện tuyến AirPlay/car audio.
 - Nhật ký thay đổi: **1.0.1** — sửa timer tự dừng tại deadline, hủy state khi tắt module, sửa lỗi compile Darwin notification/KVC/UI, chuẩn hóa quyền package staging và thêm CI build Rootful/Rootless.
 - Rootful và Rootless: Theos CI đã build và kiểm tra metadata, install paths, cùng arm64/arm64e cho source `1.1.0`; chưa cài lên thiết bị.

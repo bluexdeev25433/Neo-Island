@@ -6,16 +6,16 @@ Audit date: 2026-10-14
 
 - The checked-out `main` branch initially pointed at `5c6c5ee` (`Initial commit`) and contained only `README.md` and `LICENSE`.
 - The remote `fix/timer-expiration-1.0.1` branch contains the Theos implementation and is tagged `v1.0.1` at `d0051a8`.
-- The local worktree was clean before audit. The implementation branch is checked out locally as `fix/volume-observer`; the remote `main` branch has not been changed.
+- The initial local worktree was clean. The implementation and release changes are now merged into `main`.
 - GitHub has a published, non-draft `v1.0.1` release. Its successful build workflow is associated with commit `d0051a887a241ab0b63869a06acf6c0d2d71f90e`.
 
 ## Source and Build Audit
 
-The implementation branch contains a Theos Makefile, tweak filter, control metadata, Logos entry point, Objective-C implementation under `Sources/`, a Preferences bundle, host-side tests, and a GitHub Actions build workflow. It is a real source project, not a documentation-only repository or a set of placeholder modules.
+The repository now contains a Theos Makefile, tweak filter, control metadata, Logos entry point, Objective-C implementation under `Sources/`, a Preferences bundle, host-side tests, and GitHub Actions build/release workflows. This is real source, not placeholder modules.
 
-Implemented providers are combined in `NIModuleProvider`: media metadata and playback controls, battery level/state and a threshold reminder, output volume reads, generic network reachability, audio output route, a private persisted countdown timer, and a user-entered text item. The UI is a single overlay pill with compact and expanded layouts, gestures, module cycling, and spring animation.
+Implemented providers are combined in `NIModuleProvider`: media metadata and playback controls, battery level/state and a threshold reminder, event-driven output-volume refresh, generic network reachability, Bluetooth/wired/AirPlay/car audio routes, a private persisted countdown timer reconciled on wake/time changes, and user-entered text. `NIIslandStateManager` owns snapshots, stable selection, and compact/expanded/minimal/activity/notification mode derivation. The single overlay renderer uses a material surface, spring transitions, safe-area layout, and stable selection across updates.
 
-The request describes a substantially broader product than this source provides. There are no separate provider modules or event/state/animation architecture, no system notification-content provider, no Clock timer integration, no Live Activity or native Dynamic Island integration, and no separately implemented minimal/activity/notification display modes. The view uses a solid black background rather than a material/blur surface. Rotation has a layout callback, but no device or screen-size matrix was tested. Output volume now has a KVO observer that refreshes snapshots and is removed when disabled or when the provider is deallocated. AirPods battery, cellular/Wi-Fi identity, and system notification content are not implemented.
+The request still exceeds what public APIs and this release implement. Notification mode has no notification provider; no cross-app notification-content API was added. Clock timers, Live Activities, native Dynamic Island integration, incoming calls, AirPods battery, and Wi-Fi identity are not implemented. Rotation and safe-area behavior exist in source but were not device-tested across a screen-size matrix.
 
 ## Preferences and Stability
 
@@ -25,23 +25,22 @@ The tweak installs a single manager-owned overlay in SpringBoard and removes obs
 
 ## Tests and CI
 
-- `python3 -m unittest discover -s tests -p test_project.py -v`: 12 tests passed locally after the volume-observer change. The timer regression test compiles and runs a C test with the host Clang.
-- GitHub Actions run `38593300054` completed successfully for commit `238ceb5af33e5d43157659aafee3656db9e96ac2`, including Theos rootful/rootless builds, package checks, architecture checks, and the test suite.
-- Downloaded release files pass their published SHA-256 checks. `dpkg-deb` confirms rootful `iphoneos-arm` and rootless `iphoneos-arm64` metadata, expected dynamic library/preferences paths, and the rootless `/var/jb` prefix. These checks verify package structure, not installation or runtime behavior.
-- The successful workflow's actual package artifacts were downloaded and inspected: rootful `com.neoisland.tweak_1.0.1_iphoneos-arm.deb` (SHA-256 `beff15bb48f0c20eb77a8445667dca8a771ce372b3829d17086e3a2a9e0e5b7c`) and rootless `com.neoisland.tweak_1.0.1_iphoneos-arm64.deb` (SHA-256 `c999b8465093a6ad98050a48c39212208a745bfc2debd815488858f73e1bd5c8`). These were CI artifacts, not release assets.
-- No Theos toolchain or iOS SDK is configured in this container, so a local Theos build is unavailable.
+- `python3 -m unittest discover -s tests -v`: 19 tests pass. Timer and mode state C tests compile and run with host Clang.
+- The v1.1.0 release workflow `38600480852` completed successfully for merged main commit `c94158f1fa8c3f955e09a151fef360855d4fe37d`, including tests, Theos rootful/rootless builds, architecture and package checks, APT generation, Pages deployment, and GitHub release publication.
+- Downloaded release assets pass `SHA256SUMS`. Rootful metadata is `iphoneos-arm`; rootless is `iphoneos-arm64` and installs under `/var/jb`. Both include the tweak dylib and Preferences bundle.
+- Host `apt-get update` consumed the live `Release` and both architecture indexes. This validates APT metadata, not the Sileo app UI or installation flow.
+- No Theos toolchain or iOS SDK is installed in the local container; binary builds were performed by GitHub Actions.
 
 ## Release and Hosting
 
-- Existing release: `v1.0.1`, with rootful and rootless `.deb`, source archive, checksum file, build/test logs, package listings, and architecture reports.
-- Existing PR #1 targets `main` and contains the source implementation. It was fast-forwarded to commit `238ceb5`; the follow-up push and pull-request workflow runs were still in progress at the time of this audit update.
-- The release is version 1.0.1, not the requested 1.0.0; creating or replacing a release is not part of this audit.
-- GitHub Pages reports `has_pages: false`; no website files are present in the repository.
-- No `Release`, `Packages`, `Packages.gz`, or APT repository directory is present. There is no verified Sileo source URL or Add to Sileo link.
-- The published README explicitly states that the packages have not been installed or tested on an iPhone and lists unsupported system features.
+- Published release: [Neo Island v1.1.0](https://github.com/bluexdeev25433/Neo-Island/releases/tag/v1.1.0), with rootful/rootless `.deb`, source ZIP, and `SHA256SUMS`.
+- Website: https://bluexdeev25433.github.io/Neo-Island/ . GitHub Pages is workflow-deployed and returns HTTP 200.
+- Sileo/APT source: https://bluexdeev25433.github.io/Neo-Island/repo/ . `Release`, both `Packages.gz` indexes, and package files return HTTP 200; host APT read both indexes successfully.
+- The website only displays its Sileo link after validating Release hashes and package/version/architecture fields. Sileo itself was not installed in this environment, so the app-level add-source flow remains unverified.
+- The existing `v1.0.1` release was not modified.
 
 ## Build Environment and Scope
 
-The current container has `make`, `clang`, and `dpkg-deb`, but no `THEOS` environment or `xcodebuild`. GitHub CLI authentication is available. Real remote builds/releases can only be produced if their source and workflow pass and publication is explicitly carried through; a local device runtime test is not possible here.
+The current container has `make`, `clang`, `dpkg-deb`, and Debian APT index tools, but no `THEOS` environment or `xcodebuild`. GitHub CLI authentication was sufficient for source PRs, release assets, and Pages deployment; API dispatch/Pages policy changes were blocked, so a main-branch marker triggered the publisher.
 
-This audit does not claim production readiness. The high-risk unknowns are jailbroken-device runtime behavior, Settings stability, SpringBoard window interaction, hardware/OS coverage, preference bundle compatibility, and actual installation/removal behavior.
+This audit does not claim production readiness. Settings and SpringBoard were not launched on a jailbroken device. Repeated Settings opens, per-option changes, respring/recovery, lock/unlock, device-specific positioning, and install/removal behavior remain unverified. No runtime latency or memory measurements were taken.
