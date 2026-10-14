@@ -30,7 +30,13 @@ jobs:
       - name: Install host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential fakeroot rsync curl perl zip git libxml2-dev libtinfo6 xz-utils dpkg-dev
+          sudo apt-get install -y build-essential clang fakeroot rsync curl perl zip git libxml2-dev libtinfo6 xz-utils dpkg-dev
+
+      - name: Run tests
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+          git diff --check
+          actionlint .github/workflows/build.yml
 
       - name: Install Theos, iOS SDK, cross compiler, and ldid
         env:
@@ -45,12 +51,6 @@ jobs:
           chmod 755 "$RUNNER_TEMP/ldid"
           echo "$THEOS/toolchain/linux/iphone/bin" >> "$GITHUB_PATH"
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-
-      - name: Run tests
-        run: |
-          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
-          git diff --check
-          actionlint .github/workflows/build.yml
 
       - name: Build package
         env:
