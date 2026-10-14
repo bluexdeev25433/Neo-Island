@@ -105,6 +105,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Debian repository tools
         run: |
@@ -171,10 +173,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v1.1.0" --target "v1.1.0" \
-            release-assets/NeoIsland-1.1.0-Rootful.deb \
-            release-assets/NeoIsland-1.1.0-Rootless.deb \
-            release-assets/NeoIsland-source-1.1.0.zip \
-            release-assets/SHA256SUMS \
-            --title "Neo Island 1.1.0" \
-            --notes "Neo Island 1.1.0 adds explicit presentation state, event-driven volume updates, timer wake reconciliation, and expanded external audio-route recognition. See the repository README for supported behavior and device-testing limitations. Packages were built and structurally validated by this workflow; this release is not a claim of device-runtime certification."
+          if gh release view "v1.1.0" >/dev/null 2>&1; then
+            gh release upload "v1.1.0" \
+              release-assets/NeoIsland-1.1.0-Rootful.deb \
+              release-assets/NeoIsland-1.1.0-Rootless.deb \
+              release-assets/NeoIsland-source-1.1.0.zip \
+              release-assets/SHA256SUMS \
+              --clobber
+          else
+            gh release create "v1.1.0" --target "v1.1.0" \
+              release-assets/NeoIsland-1.1.0-Rootful.deb \
+              release-assets/NeoIsland-1.1.0-Rootless.deb \
+              release-assets/NeoIsland-source-1.1.0.zip \
+              release-assets/SHA256SUMS \
+              --title "Neo Island 1.1.0" \
+              --notes "Neo Island 1.1.0 adds explicit presentation state, event-driven volume updates, timer wake reconciliation, and expanded external audio-route recognition. See the repository README for supported behavior and device-testing limitations. Packages were built and structurally validated by this workflow; this release is not a claim of device-runtime certification."
+          fi
