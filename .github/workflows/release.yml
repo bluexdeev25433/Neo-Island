@@ -3,6 +3,7 @@ name: Build and publish Neo Island 1.1.0
 on:
   push:
     tags: ["v1.1.0"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -148,7 +149,7 @@ jobs:
           Description: Neo Island jailbreak tweak packages
           EOF
           (cd site/repo/dists/stable && apt-ftparchive release . | sed -E '/[[:space:]]Release$/d') >> site/repo/dists/stable/Release
-          git archive --format=zip --prefix=NeoIsland-${VERSION}/ "$GITHUB_SHA" > release-assets/NeoIsland-source-${VERSION}.zip
+          git archive --format=zip --prefix=NeoIsland-${VERSION}/ "v${VERSION}" > release-assets/NeoIsland-source-${VERSION}.zip
           (cd release-assets && sha256sum NeoIsland-${VERSION}-Rootful.deb NeoIsland-${VERSION}-Rootless.deb NeoIsland-source-${VERSION}.zip > SHA256SUMS)
           cp release-assets/SHA256SUMS site/SHA256SUMS
           test -s site/repo/dists/stable/Release
@@ -168,7 +169,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "v1.1.0" --target "v1.1.0" \
             release-assets/NeoIsland-1.1.0-Rootful.deb \
             release-assets/NeoIsland-1.1.0-Rootless.deb \
             release-assets/NeoIsland-source-1.1.0.zip \
