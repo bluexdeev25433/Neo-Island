@@ -37,12 +37,15 @@ class ProjectStructureTests(unittest.TestCase):
     def test_release_workflow_builds_packages_and_generates_verified_apt_repo(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         self.assertIn('tags: ["v1.1.0"]', workflow)
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("if: github.event_name == 'workflow_dispatch'", workflow)
         self.assertIn("dpkg-scanpackages", workflow)
         self.assertIn("apt-ftparchive release", workflow)
         self.assertIn("SHA256SUMS", workflow)
         self.assertIn("actions/upload-pages-artifact", workflow)
         self.assertIn("actions/deploy-pages", workflow)
         self.assertLess(workflow.index("actions/deploy-pages@v4"), workflow.index("gh release create"))
+        self.assertIn('git archive --format=zip --prefix=NeoIsland-${VERSION}/ "v${VERSION}"', workflow)
 
     def test_website_hides_sileo_link_until_repository_indexes_validate(self):
         website = (ROOT / "docs/index.html").read_text()
