@@ -92,6 +92,7 @@ jobs:
 
   publish:
     name: Publish release and APT repository
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-24.04
     permissions:
