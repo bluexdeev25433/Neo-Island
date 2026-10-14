@@ -6,7 +6,7 @@ Audit date: 2026-10-14
 
 - The checked-out `main` branch initially pointed at `5c6c5ee` (`Initial commit`) and contained only `README.md` and `LICENSE`.
 - The remote `fix/timer-expiration-1.0.1` branch contains the Theos implementation and is tagged `v1.0.1` at `d0051a8`.
-- The local worktree was clean before audit. The implementation branch is checked out locally as `audit/release-baseline`; the remote `main` branch has not been changed.
+- The local worktree was clean before audit. The implementation branch is checked out locally as `fix/volume-observer`; the remote `main` branch has not been changed.
 - GitHub has a published, non-draft `v1.0.1` release. Its successful build workflow is associated with commit `d0051a887a241ab0b63869a06acf6c0d2d71f90e`.
 
 ## Source and Build Audit
@@ -15,7 +15,7 @@ The implementation branch contains a Theos Makefile, tweak filter, control metad
 
 Implemented providers are combined in `NIModuleProvider`: media metadata and playback controls, battery level/state and a threshold reminder, output volume reads, generic network reachability, audio output route, a private persisted countdown timer, and a user-entered text item. The UI is a single overlay pill with compact and expanded layouts, gestures, module cycling, and spring animation.
 
-The request describes a substantially broader product than this source provides. There are no separate provider modules or event/state/animation architecture, no system notification-content provider, no Clock timer integration, no Live Activity or native Dynamic Island integration, and no separately implemented minimal/activity/notification display modes. The view uses a solid black background rather than a material/blur surface. Rotation has a layout callback, but no device or screen-size matrix was tested. Volume is read when a snapshot refresh occurs; it does not have a dedicated volume-change observer. AirPods battery, cellular/Wi-Fi identity, and system notification content are not implemented.
+The request describes a substantially broader product than this source provides. There are no separate provider modules or event/state/animation architecture, no system notification-content provider, no Clock timer integration, no Live Activity or native Dynamic Island integration, and no separately implemented minimal/activity/notification display modes. The view uses a solid black background rather than a material/blur surface. Rotation has a layout callback, but no device or screen-size matrix was tested. Output volume now has a KVO observer that refreshes snapshots and is removed when disabled or when the provider is deallocated. AirPods battery, cellular/Wi-Fi identity, and system notification content are not implemented.
 
 ## Preferences and Stability
 
@@ -25,14 +25,16 @@ The tweak installs a single manager-owned overlay in SpringBoard and removes obs
 
 ## Tests and CI
 
-- `python3 -m unittest discover -s tests -v`: 11 tests passed locally on the implementation branch. The timer regression test compiles and runs a C test with the host Clang.
-- The published GitHub Actions run completed successfully for the tagged source, including Theos rootful/rootless builds, package checks, architecture checks, and the same 11-test suite.
+- `python3 -m unittest discover -s tests -p test_project.py -v`: 12 tests passed locally after the volume-observer change. The timer regression test compiles and runs a C test with the host Clang.
+- GitHub Actions run `38593300054` completed successfully for commit `238ceb5af33e5d43157659aafee3656db9e96ac2`, including Theos rootful/rootless builds, package checks, architecture checks, and the test suite.
 - Downloaded release files pass their published SHA-256 checks. `dpkg-deb` confirms rootful `iphoneos-arm` and rootless `iphoneos-arm64` metadata, expected dynamic library/preferences paths, and the rootless `/var/jb` prefix. These checks verify package structure, not installation or runtime behavior.
+- The successful workflow's actual package artifacts were downloaded and inspected: rootful `com.neoisland.tweak_1.0.1_iphoneos-arm.deb` (SHA-256 `beff15bb48f0c20eb77a8445667dca8a771ce372b3829d17086e3a2a9e0e5b7c`) and rootless `com.neoisland.tweak_1.0.1_iphoneos-arm64.deb` (SHA-256 `c999b8465093a6ad98050a48c39212208a745bfc2debd815488858f73e1bd5c8`). These were CI artifacts, not release assets.
 - No Theos toolchain or iOS SDK is configured in this container, so a local Theos build is unavailable.
 
 ## Release and Hosting
 
 - Existing release: `v1.0.1`, with rootful and rootless `.deb`, source archive, checksum file, build/test logs, package listings, and architecture reports.
+- Existing PR #1 targets `main` and contains the source implementation. It was fast-forwarded to commit `238ceb5`; the follow-up push and pull-request workflow runs were still in progress at the time of this audit update.
 - The release is version 1.0.1, not the requested 1.0.0; creating or replacing a release is not part of this audit.
 - GitHub Pages reports `has_pages: false`; no website files are present in the repository.
 - No `Release`, `Packages`, `Packages.gz`, or APT repository directory is present. There is no verified Sileo source URL or Add to Sileo link.
