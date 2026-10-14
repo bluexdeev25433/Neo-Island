@@ -1,5 +1,6 @@
 #import "NIIslandView.h"
 #import "NIConfigurationManager.h"
+#import "NIIslandStateManager.h"
 #import "NIModuleProvider.h"
 #import "NIIconRenderer.h"
 #import <MediaPlayer/MediaPlayer.h>
@@ -19,8 +20,10 @@
 
 @interface NIIslandView ()
 @property (nonatomic, strong) NIModuleProvider *moduleProvider;
+@property (nonatomic, strong) NIIslandStateManager *stateManager;
 @property (nonatomic, strong) NIIslandPassThroughWindow *window;
 @property (nonatomic, strong) UIView *pill;
+@property (nonatomic, strong) UIVisualEffectView *materialView;
 @property (nonatomic, strong) UIImageView *artworkView;
 @property (nonatomic, strong) UIImageView *symbolView;
 @property (nonatomic, strong) UILabel *titleLabel;
@@ -28,10 +31,9 @@
 @property (nonatomic, strong) UIButton *previousButton;
 @property (nonatomic, strong) UIButton *playPauseButton;
 @property (nonatomic, strong) UIButton *nextButton;
-@property (nonatomic, copy) NSArray<NSDictionary<NSString *, id> *> *snapshots;
-@property (nonatomic) NSUInteger currentIndex;
 @property (nonatomic) NSUInteger expansionGeneration;
-@property (nonatomic) BOOL expanded;
+@property (nonatomic) BOOL hasRenderedMode;
+- (void)renderCurrentSnapshotAnimated:(BOOL)animated;
 @end
 
 @implementation NIIslandView
@@ -40,7 +42,7 @@
     self = [super init];
     if (self) {
         _moduleProvider = moduleProvider;
-        _snapshots = @[];
+        _stateManager = [NIIslandStateManager new];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(layoutForDeviceChange)
             name:UIDeviceOrientationDidChangeNotification object:nil];
     }
@@ -70,12 +72,23 @@
     self.window.hidden = NO;
 
     self.pill = [UIView new];
-    self.pill.backgroundColor = UIColor.blackColor;
+    self.pill.backgroundColor = UIColor.clearColor;
     self.pill.layer.masksToBounds = YES;
+    self.pill.layer.borderWidth = 0.5;
+    self.pill.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.16].CGColor;
     self.pill.isAccessibilityElement = YES;
     self.pill.accessibilityTraits = UIAccessibilityTraitButton;
     [self.window.rootViewController.view addSubview:self.pill];
     self.window.pillView = self.pill;
+
+    UIBlurEffectStyle materialStyle = UIAccessibilityIsReduceTransparencyEnabled()
+        ? UIBlurEffectStyleDark : UIBlurEffectStyleSystemChromeMaterialDark;
+    self.materialView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:materialStyle]];
+    self.materialView.userInteractionEnabled = NO;
+    self.materialView.frame = self.pill.bounds;
+    self.materialView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.pill addSubview:self.materialView];
+    [self.pill sendSubviewToBack:self.materialView];
 
     self.artworkView = [UIImageView new];
     self.artworkView.contentMode = UIViewContentModeScaleAspectFill;
@@ -121,24 +134,27 @@
 }
 
 - (void)updateWithSnapshots:(NSArray<NSDictionary<NSString *, id> *> *)snapshots {
-    self.snapshots = snapshots ?: @[];
-    if (self.snapshots.count > 0 && [self.snapshots.firstObject[@"kind"] isEqual:@"warning"]) self.currentIndex = 0;
-    else if (self.snapshots.count > 0) self.currentIndex %= self.snapshots.count;
-    else self.currentIndex = 0;
-    [self renderCurrentSnapshot];
+    NIIslandMode previousMode = self.stateManager.mode;
+    BOOL hadRenderedMode = self.hasRenderedMode;
+    [self.stateManager updateSnapshots:snapshots idleVisible:[NIConfigurationManager.sharedManager boolForKey:@"AlwaysShowIdle"]];
+    [self renderCurrentSnapshotAnimated:!hadRenderedMode || previousMode != self.stateManager.mode];
 }
 
 - (NSDictionary *)currentSnapshot {
-    return self.snapshots.count > 0 ? self.snapshots[self.currentIndex] : nil;
+    return self.stateManager.currentSnapshot;
 }
 
 - (void)renderCurrentSnapshot {
-    NSDictionary *snapshot = [self currentSnapshot];
-    BOOL idle = !snapshot && [NIConfigurationManager.sharedManager boolForKey:@"AlwaysShowIdle"];
-    self.pill.hidden = !snapshot && !idle;
-    if (!snapshot && !idle) return;
+    [self renderCurrentSnapshotAnimated:NO];
+}
 
-    NSString *title = snapshot[@"title"] ?: @"Dynamic Island";
+- (void)renderCurrentSnapshotAnimated:(BOOL)animated {
+    NSDictionary *snapshot = [self currentSnapshot];
+    NIIslandMode mode = self.stateManager.mode;
+    self.pill.hidden = !self.stateManager.shouldShowContent;
+    if (self.pill.hidden) return;
+
+    NSString *title = snapshot[@"title"] ?: @"";
     NSString *subtitle = snapshot[@"subtitle"] ?: @"";
     self.titleLabel.text = title;
     self.subtitleLabel.text = subtitle;
@@ -151,9 +167,10 @@
     self.symbolView.hidden = self.artworkView.image != nil;
     BOOL isMusic = [snapshot[@"kind"] isEqual:@"music"];
     BOOL isTimer = [snapshot[@"kind"] isEqual:@"timer"];
-    self.previousButton.hidden = !self.expanded || !isMusic;
-    self.nextButton.hidden = !self.expanded || !isMusic;
-    self.playPauseButton.hidden = !self.expanded || (!isMusic && !isTimer);
+    BOOL expanded = self.stateManager.isExpanded;
+    self.previousButton.hidden = !expanded || !isMusic;
+    self.nextButton.hidden = !expanded || !isMusic;
+    self.playPauseButton.hidden = !expanded || (!isMusic && !isTimer);
     if (isMusic) {
         BOOL playing = [snapshot[@"playing"] boolValue];
         UIImage *controlImage = [NIIconRenderer imageForSymbol:playing ? @"pause.fill" : @"play.fill" pointSize:16];
@@ -165,9 +182,9 @@
         self.playPauseButton.accessibilityLabel = paused ? @"Resume timer" : @"Pause timer";
     }
     NSMutableArray<UIAccessibilityCustomAction *> *actions = [NSMutableArray array];
-    [actions addObject:[[UIAccessibilityCustomAction alloc] initWithName:self.expanded ? @"Collapse" : @"Expand"
+    [actions addObject:[[UIAccessibilityCustomAction alloc] initWithName:expanded ? @"Collapse" : @"Expand"
         target:self selector:@selector(performAccessibilityAction:)]];
-    if (self.snapshots.count > 1) {
+    if (self.stateManager.snapshots.count > 1) {
         [actions addObject:[[UIAccessibilityCustomAction alloc] initWithName:@"Next module" target:self selector:@selector(performAccessibilityAction:)]];
         [actions addObject:[[UIAccessibilityCustomAction alloc] initWithName:@"Previous module" target:self selector:@selector(performAccessibilityAction:)]];
     }
@@ -181,7 +198,8 @@
             target:self selector:@selector(performAccessibilityAction:)]];
     }
     self.pill.accessibilityCustomActions = actions;
-    [self layoutPillAnimated:NO];
+    [self layoutPillAnimated:animated];
+    self.hasRenderedMode = YES;
 }
 
 - (BOOL)performAccessibilityAction:(UIAccessibilityCustomAction *)action {
@@ -203,8 +221,20 @@
     CGRect bounds = self.window.bounds;
     UIEdgeInsets safe = self.window.safeAreaInsets;
     CGFloat maximumWidth = CGRectGetWidth(bounds) - safe.left - safe.right - 20;
-    CGFloat width = self.expanded ? MIN(maximumWidth, 330) : MIN(maximumWidth, [configuration floatForKey:@"PillWidth"]);
-    CGFloat height = self.expanded ? MAX(100, [configuration floatForKey:@"PillHeight"] + 52) : [configuration floatForKey:@"PillHeight"];
+    NIIslandMode mode = self.stateManager.mode;
+    CGFloat compactWidth = MIN(maximumWidth, [configuration floatForKey:@"PillWidth"]);
+    CGFloat compactHeight = [configuration floatForKey:@"PillHeight"];
+    CGFloat width = compactWidth;
+    CGFloat height = compactHeight;
+    if (mode == NIIslandModeExpanded) {
+        width = MIN(maximumWidth, 340);
+        height = MAX(108, compactHeight + 56);
+    } else if (mode == NIIslandModeMinimal) {
+        width = MIN(maximumWidth, MAX(48, compactHeight));
+    } else if (mode == NIIslandModeNotification) {
+        width = MIN(maximumWidth, 340);
+        height = MAX(76, compactHeight + 28);
+    }
     CGFloat scale = [configuration floatForKey:@"ContentScale"];
     CGFloat x = (CGRectGetWidth(bounds) - width) / 2 + [configuration floatForKey:@"OffsetX"];
     x = MIN(CGRectGetWidth(bounds) - safe.right - width - 10, MAX(safe.left + 10, x));
@@ -214,17 +244,21 @@
     void (^layout)(void) = ^{
         self.pill.frame = frame;
         self.pill.layer.cornerRadius = height / 2;
-        CGFloat artSide = self.expanded ? 42 : MIN(height - 8, 30);
+        BOOL expanded = mode == NIIslandModeExpanded;
+        BOOL minimal = mode == NIIslandModeMinimal;
+        CGFloat artSide = expanded ? 42 : MIN(height - 8, 30);
         self.artworkView.frame = CGRectMake(10, (height - artSide) / 2, artSide, artSide);
         self.artworkView.layer.cornerRadius = artSide * 0.22;
         self.symbolView.frame = self.artworkView.frame;
-        CGFloat rightControls = self.expanded && !self.previousButton.hidden ? 105 : 0;
+        CGFloat rightControls = expanded && !self.previousButton.hidden ? 105 : 0;
         CGFloat textX = 18 + artSide;
         CGFloat textWidth = MAX(40, width - textX - 18 - rightControls);
-        self.titleLabel.frame = CGRectMake(textX, self.expanded ? 20 : 0, textWidth, self.expanded ? 22 : height);
+        self.titleLabel.hidden = minimal;
+        self.symbolView.hidden = minimal ? NO : self.artworkView.image != nil;
+        self.titleLabel.frame = CGRectMake(textX, expanded ? 20 : 0, textWidth, expanded ? 22 : height);
         self.subtitleLabel.frame = CGRectMake(textX, 44, textWidth, 16);
-        self.subtitleLabel.hidden = !self.expanded || self.subtitleLabel.text.length == 0;
-        self.titleLabel.font = [UIFont systemFontOfSize:(self.expanded ? 14 : 13) * scale weight:UIFontWeightSemibold];
+        self.subtitleLabel.hidden = !expanded && mode != NIIslandModeNotification || self.subtitleLabel.text.length == 0;
+        self.titleLabel.font = [UIFont systemFontOfSize:(expanded ? 14 : 13) * scale weight:UIFontWeightSemibold];
         self.subtitleLabel.font = [UIFont systemFontOfSize:10 * scale weight:UIFontWeightRegular];
         self.previousButton.frame = CGRectMake(width - 96, height - 34, 24, 24);
         self.playPauseButton.frame = CGRectMake(width - 62, height - 34, 24, 24);
@@ -240,9 +274,9 @@
 }
 
 - (void)toggleExpanded {
-    self.expanded = !self.expanded;
-    [self layoutPillAnimated:YES];
-    if (self.expanded) [self scheduleCollapse];
+    [self.stateManager toggleExpanded];
+    [self renderCurrentSnapshotAnimated:YES];
+    if (self.stateManager.isExpanded) [self scheduleCollapse];
     if ([NIConfigurationManager.sharedManager boolForKey:@"HapticsEnabled"]) {
         [[[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight] impactOccurred];
     }
@@ -250,24 +284,23 @@
 
 - (void)handleLongPress:(UILongPressGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateBegan) return;
-    if (!self.expanded) {
-        self.expanded = YES;
-        [self layoutPillAnimated:YES];
+    if (!self.stateManager.isExpanded) {
+        [self.stateManager toggleExpanded];
+        [self renderCurrentSnapshotAnimated:YES];
         [self scheduleCollapse];
     }
 }
 
 - (void)handleSwipe:(UIPanGestureRecognizer *)gesture {
-    if (gesture.state != UIGestureRecognizerStateEnded || self.snapshots.count < 2) return;
+    if (gesture.state != UIGestureRecognizerStateEnded || self.stateManager.snapshots.count < 2) return;
     CGFloat translation = [gesture translationInView:self.pill].x;
     if (fabs(translation) < 28) return;
     [self handleSwipeDirection:translation < 0 ? 1 : -1];
 }
 
 - (void)handleSwipeDirection:(NSInteger)direction {
-    if (self.snapshots.count < 2) return;
-    self.currentIndex = (self.currentIndex + (direction > 0 ? 1 : self.snapshots.count - 1)) % self.snapshots.count;
-    [self renderCurrentSnapshot];
+    [self.stateManager moveSelection:direction];
+    [self renderCurrentSnapshotAnimated:YES];
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
@@ -286,9 +319,9 @@
     NSUInteger generation = ++self.expansionGeneration;
     __weak typeof(self) weakSelf = self;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        if (!weakSelf || !weakSelf.expanded || weakSelf.expansionGeneration != generation) return;
-        weakSelf.expanded = NO;
-        [weakSelf layoutPillAnimated:YES];
+        if (!weakSelf || !weakSelf.stateManager.isExpanded || weakSelf.expansionGeneration != generation) return;
+        [weakSelf.stateManager collapse];
+        [weakSelf renderCurrentSnapshotAnimated:YES];
     });
 }
 
@@ -300,7 +333,12 @@
 
 - (void)nextTrack { [self.moduleProvider nextTrack]; }
 - (void)previousTrack { [self.moduleProvider previousTrack]; }
-- (void)layoutForDeviceChange { [self layoutPillAnimated:NO]; }
+- (void)layoutForDeviceChange {
+    self.window.frame = UIScreen.mainScreen.bounds;
+    [self.window.rootViewController.view setNeedsLayout];
+    [self.window.rootViewController.view layoutIfNeeded];
+    [self layoutPillAnimated:NO];
+}
 
 - (void)show {
     if (!self.window) [self buildWindow];
@@ -310,7 +348,7 @@
         self.window.hidden = YES;
         return;
     }
-    BOOL hasData = self.snapshots.count > 0;
+    BOOL hasData = self.stateManager.snapshots.count > 0;
     BOOL idle = [NIConfigurationManager.sharedManager boolForKey:@"AlwaysShowIdle"];
     self.window.hidden = !hasData && !idle;
 }

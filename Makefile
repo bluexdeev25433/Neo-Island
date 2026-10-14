@@ -4,7 +4,7 @@ ARCHS := arm64 arm64e
 include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME := NeoIsland
-NeoIsland_FILES := Tweak.x Sources/NIConfigurationManager.m Sources/NICompatibility.m Sources/NIIslandManager.m Sources/NIIslandView.m Sources/NIModuleProvider.m Sources/NIIconRenderer.m
+NeoIsland_FILES := Tweak.x Sources/NIConfigurationManager.m Sources/NICompatibility.m Sources/NIIslandManager.m Sources/NIIslandStateManager.m Sources/NIIslandView.m Sources/NIModuleProvider.m Sources/NIIconRenderer.m
 NeoIsland_CFLAGS := -fobjc-arc -Wall -Wextra
 NeoIsland_FRAMEWORKS := UIKit Foundation QuartzCore MediaPlayer AVFAudio SystemConfiguration
 

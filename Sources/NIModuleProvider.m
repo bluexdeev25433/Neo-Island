@@ -45,6 +45,8 @@ static void NIReachabilityChanged(SCNetworkReachabilityRef target, SCNetworkReac
         NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
         [center addObserver:self selector:@selector(protectedDataChanged:) name:UIApplicationProtectedDataWillBecomeUnavailable object:nil];
         [center addObserver:self selector:@selector(protectedDataChanged:) name:UIApplicationProtectedDataDidBecomeAvailable object:nil];
+        [center addObserver:self selector:@selector(applicationStateChanged:) name:UIApplicationDidBecomeActiveNotification object:nil];
+        [center addObserver:self selector:@selector(applicationStateChanged:) name:UIApplicationSignificantTimeChangeNotification object:nil];
         [self updateObserversForConfiguration];
         [self updateBatteryTransition];
         [self refreshAndNotify];
@@ -98,6 +100,19 @@ static void NIReachabilityChanged(SCNetworkReachabilityRef target, SCNetworkReac
 
 - (void)protectedDataChanged:(NSNotification *)notification {
     (void)notification;
+    [self refreshAndNotify];
+}
+
+- (void)applicationStateChanged:(NSNotification *)notification {
+    (void)notification;
+    [self updateBatteryTransition];
+    NITimerLogicState state = [self currentTimerState];
+    if ([NIConfigurationManager.sharedManager boolForKey:@"TimerEnabled"] &&
+        NITimerLogicIsExpired(state, NSDate.date.timeIntervalSince1970)) {
+        [self finishTimer];
+        return;
+    }
+    if (state.endTimestamp > NSDate.date.timeIntervalSince1970) [self startTicker];
     [self refreshAndNotify];
 }
 
@@ -182,11 +197,25 @@ static void NIReachabilityChanged(SCNetworkReachabilityRef target, SCNetworkReac
     if (![NIConfigurationManager.sharedManager boolForKey:@"AudioRouteEnabled"]) return nil;
     AVAudioSessionPortDescription *port = AVAudioSession.sharedInstance.currentRoute.outputs.firstObject;
     if (!port) return nil;
-    BOOL headset = [@[AVAudioSessionPortBluetoothA2DP, AVAudioSessionPortBluetoothHFP,
-        AVAudioSessionPortBluetoothLE, AVAudioSessionPortHeadphones] containsObject:port.portType];
-    if (!headset) return nil;
-    return @{@"id": @"audioRoute", @"title": port.portName ?: @"Audio device", @"subtitle": @"Connected",
-        @"symbol": @"headphones", @"kind": @"audioRoute"};
+    NSString *subtitle = nil;
+    NSString *symbol = nil;
+    if ([@[AVAudioSessionPortBluetoothA2DP, AVAudioSessionPortBluetoothHFP,
+        AVAudioSessionPortBluetoothLE] containsObject:port.portType]) {
+        subtitle = @"Bluetooth audio";
+        symbol = @"headphones";
+    } else if ([port.portType isEqualToString:AVAudioSessionPortHeadphones]) {
+        subtitle = @"Headphones";
+        symbol = @"headphones";
+    } else if ([port.portType isEqualToString:AVAudioSessionPortAirPlay]) {
+        subtitle = @"AirPlay";
+        symbol = @"airplayaudio";
+    } else if ([port.portType isEqualToString:AVAudioSessionPortCarAudio]) {
+        subtitle = @"Car audio";
+        symbol = @"car.fill";
+    }
+    if (!subtitle) return nil;
+    return @{@"id": @"audioRoute", @"title": port.portName.length ? port.portName : subtitle,
+        @"subtitle": subtitle, @"symbol": symbol, @"kind": @"audioRoute"};
 }
 
 - (NSDictionary *)timerSnapshot {

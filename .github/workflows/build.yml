@@ -74,7 +74,7 @@ jobs:
           dpkg-deb -f "$package" Package Version Architecture Depends
           dpkg-deb -c "$package" | tee package-contents.txt
           test "$(dpkg-deb -f "$package" Package)" = "com.neoisland.tweak"
-          test "$(dpkg-deb -f "$package" Version)" = "1.0.1"
+          test "$(dpkg-deb -f "$package" Version)" = "1.1.0"
           if [[ "${{ matrix.scheme }}" == "rootless" ]]; then
             expected_arch=iphoneos-arm64
           else

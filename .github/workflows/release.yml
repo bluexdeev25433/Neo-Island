@@ -1,0 +1,177 @@
+name: Build and publish Neo Island 1.1.0
+
+on:
+  push:
+    tags: ["v1.1.0"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.scheme }} package
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        scheme: [rootful, rootless]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang fakeroot rsync curl perl zip git libxml2-dev libtinfo6 xz-utils dpkg-dev
+
+      - name: Run tests
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+          git diff --check
+
+      - name: Install Theos, iOS SDK, cross compiler, and ldid
+        env:
+          THEOS: ${{ runner.temp }}/theos
+        run: |
+          git clone --depth=1 --recursive https://github.com/theos/theos.git "$THEOS"
+          "$THEOS/bin/install-sdk" iPhoneOS16.5
+          curl -fsSL https://github.com/L1ghtmann/llvm-project/releases/download/main-update_3-eabca92/iOSToolchain-x86_64.tar.xz \
+            | tar -xJf - -C "$THEOS/toolchain"
+          curl -fsSL -o "$RUNNER_TEMP/ldid" \
+            https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_linux_x86_64
+          chmod 755 "$RUNNER_TEMP/ldid"
+          echo "$THEOS/toolchain/linux/iphone/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Build package
+        env:
+          THEOS: ${{ runner.temp }}/theos
+        run: |
+          umask 022
+          set -o pipefail
+          if [[ "${{ matrix.scheme }}" == "rootless" ]]; then
+            make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless 2>&1 | tee build.log
+          else
+            make clean package FINALPACKAGE=1 2>&1 | tee build.log
+          fi
+
+      - name: Validate package
+        env:
+          THEOS: ${{ runner.temp }}/theos
+        run: |
+          set -euo pipefail
+          package=$(find packages -maxdepth 1 -type f -name '*.deb' -print -quit)
+          test -n "$package"
+          test "$(dpkg-deb -f "$package" Package)" = "com.neoisland.tweak"
+          test "$(dpkg-deb -f "$package" Version)" = "1.1.0"
+          if [[ "${{ matrix.scheme }}" == "rootless" ]]; then
+            expected_arch=iphoneos-arm64
+            prefix="$(mktemp -d)/var/jb"
+          else
+            expected_arch=iphoneos-arm
+            prefix="$(mktemp -d)"
+          fi
+          test "$(dpkg-deb -f "$package" Architecture)" = "$expected_arch"
+          dpkg-deb -x "$package" "${prefix%/var/jb}"
+          test -f "$prefix/Library/MobileSubstrate/DynamicLibraries/NeoIsland.dylib"
+          test -f "$prefix/Library/PreferenceBundles/NeoIslandPrefs.bundle/NeoIslandPrefs"
+          "$THEOS/toolchain/linux/iphone/bin/llvm-lipo" -info "$prefix/Library/MobileSubstrate/DynamicLibraries/NeoIsland.dylib" | tee binary-architectures.txt
+          grep -q arm64 binary-architectures.txt
+          grep -q arm64e binary-architectures.txt
+
+      - name: Upload package and build evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neo-island-${{ matrix.scheme }}-release
+          path: |
+            packages/*.deb
+            build.log
+            binary-architectures.txt
+          if-no-files-found: error
+
+  publish:
+    name: Publish release and APT repository
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Debian repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev apt-utils
+
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: neo-island-*-release
+          path: incoming
+          merge-multiple: true
+
+      - name: Assemble release assets and APT repository
+        env:
+          VERSION: 1.1.0
+        run: |
+          set -euo pipefail
+          mkdir -p site/repo/pool/main/n/neoisland site/repo/dists/stable/main/binary-iphoneos-arm site/repo/dists/stable/main/binary-iphoneos-arm64 release-assets
+          rootful=$(find incoming -type f -name '*_iphoneos-arm.deb' -print -quit)
+          rootless=$(find incoming -type f -name '*_iphoneos-arm64.deb' -print -quit)
+          test -n "$rootful"
+          test -n "$rootless"
+          cp "$rootful" release-assets/NeoIsland-${VERSION}-Rootful.deb
+          cp "$rootless" release-assets/NeoIsland-${VERSION}-Rootless.deb
+          cp "$rootful" site/repo/pool/main/n/neoisland/
+          cp "$rootless" site/repo/pool/main/n/neoisland/
+          cp docs/index.html docs/neo-island-mark.svg site/
+          for arch in iphoneos-arm iphoneos-arm64; do
+            index="dists/stable/main/binary-${arch}/Packages"
+            (cd site/repo && dpkg-scanpackages --arch "$arch" pool/main/n/neoisland /dev/null) > "site/repo/$index"
+            (cd site/repo && gzip -n -9 -c "$index" > "$index.gz")
+            grep -q '^Package: com.neoisland.tweak$' "site/repo/$index"
+            grep -q '^Version: 1.1.0$' "site/repo/$index"
+            grep -q "^Architecture: ${arch}$" "site/repo/$index"
+          done
+          cat > site/repo/dists/stable/Release <<'EOF'
+          Origin: Neo Island
+          Label: Neo Island
+          Suite: stable
+          Codename: stable
+          Architectures: iphoneos-arm iphoneos-arm64
+          Components: main
+          Description: Neo Island jailbreak tweak packages
+          EOF
+          (cd site/repo/dists/stable && apt-ftparchive release . | sed -E '/[[:space:]]Release$/d') >> site/repo/dists/stable/Release
+          git archive --format=zip --prefix=NeoIsland-${VERSION}/ "$GITHUB_SHA" > release-assets/NeoIsland-source-${VERSION}.zip
+          (cd release-assets && sha256sum NeoIsland-${VERSION}-Rootful.deb NeoIsland-${VERSION}-Rootless.deb NeoIsland-source-${VERSION}.zip > SHA256SUMS)
+          cp release-assets/SHA256SUMS site/SHA256SUMS
+          test -s site/repo/dists/stable/Release
+          test -s site/repo/dists/stable/main/binary-iphoneos-arm/Packages.gz
+          test -s site/repo/dists/stable/main/binary-iphoneos-arm64/Packages.gz
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            release-assets/NeoIsland-1.1.0-Rootful.deb \
+            release-assets/NeoIsland-1.1.0-Rootless.deb \
+            release-assets/NeoIsland-source-1.1.0.zip \
+            release-assets/SHA256SUMS \
+            --title "Neo Island 1.1.0" \
+            --notes "Neo Island 1.1.0 adds explicit presentation state, event-driven volume updates, timer wake reconciliation, and expanded external audio-route recognition. See the repository README for supported behavior and device-testing limitations. Packages were built and structurally validated by this workflow; this release is not a claim of device-runtime certification."
+
+      - name: Upload website and verified repository
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -23,15 +23,33 @@ class ProjectStructureTests(unittest.TestCase):
         control = (ROOT / "control").read_text()
         prefs = plistlib.loads((ROOT / "Preferences/Info.plist").read_bytes())
         readme = (ROOT / "README.md").read_text()
-        self.assertRegex(control, r"(?m)^Version: 1\.0\.1$")
-        self.assertEqual(prefs["CFBundleVersion"], "1.0.1")
-        self.assertIn("**1.0.1**", readme)
+        self.assertRegex(control, r"(?m)^Version: 1\.1\.0$")
+        self.assertEqual(prefs["CFBundleVersion"], "1.1.0")
+        self.assertEqual(prefs["CFBundleShortVersionString"], "1.1.0")
+        self.assertIn("**1.1.0**", readme)
 
     def test_ci_pins_the_available_ios_sdk_and_uploads_logs_on_failure(self):
         workflow = (ROOT / ".github/workflows/build.yml").read_text()
         self.assertIn('install-sdk" iPhoneOS16.5', workflow)
         self.assertIn("if: always()", workflow)
         self.assertIn("if: success()", workflow)
+
+    def test_release_workflow_builds_packages_and_generates_verified_apt_repo(self):
+        workflow = (ROOT / ".github/workflows/release.yml").read_text()
+        self.assertIn('tags: ["v1.1.0"]', workflow)
+        self.assertIn("dpkg-scanpackages", workflow)
+        self.assertIn("apt-ftparchive release", workflow)
+        self.assertIn("SHA256SUMS", workflow)
+        self.assertIn("actions/upload-pages-artifact", workflow)
+        self.assertIn("actions/deploy-pages", workflow)
+
+    def test_website_hides_sileo_link_until_repository_indexes_validate(self):
+        website = (ROOT / "docs/index.html").read_text()
+        self.assertIn('id="sileo-button"', website)
+        self.assertIn('id="sileo-button" href="#" hidden', website)
+        self.assertIn('crypto.subtle.digest("SHA-256"', website)
+        self.assertIn("verifyIndex(\"iphoneos-arm\", releaseText)", website)
+        self.assertIn("verifyIndex(\"iphoneos-arm64\", releaseText)", website)
 
     def test_makefiles_reference_existing_sources(self):
         root_make = (ROOT / "Makefile").read_text()
@@ -50,6 +68,12 @@ class ProjectStructureTests(unittest.TestCase):
         schema_keys = set(re.findall(r'@"([A-Za-z][A-Za-z0-9]+)"\s*:', configuration))
         self.assertTrue(setting_keys)
         self.assertLessEqual(setting_keys, schema_keys)
+
+    def test_preferences_guard_invalid_keys_and_unavailable_defaults(self):
+        settings = (ROOT / "Preferences/NISettingsController.m").read_text()
+        self.assertIn('if (![key isKindOfClass:NSString.class] || key.length == 0) return nil;', settings)
+        self.assertIn('|| !self.settings) return;', settings)
+        self.assertIn('command < 1 || command > 4', settings)
 
     def test_epoch_timestamp_is_not_clamped_to_slider_ranges(self):
         source = (ROOT / "Sources/NIConfigurationManager.m").read_text()
@@ -86,6 +110,32 @@ class ProjectStructureTests(unittest.TestCase):
             )
             subprocess.run([str(binary)], cwd=ROOT, check=True)
 
+    def test_island_mode_transitions_binary(self):
+        with tempfile.TemporaryDirectory(prefix="neo-island-mode-test-") as temp_dir:
+            binary = pathlib.Path(temp_dir) / "island-mode-test"
+            subprocess.run(
+                ["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-ISources",
+                 "tests/island_mode_test.c", "-o", str(binary)],
+                cwd=ROOT,
+                check=True,
+            )
+            subprocess.run([str(binary)], cwd=ROOT, check=True)
+
+    def test_renderer_delegates_selection_and_state_to_manager(self):
+        renderer = (ROOT / "Sources/NIIslandView.m").read_text()
+        state = (ROOT / "Sources/NIIslandStateManager.m").read_text()
+        self.assertIn("NIIslandStateManager *stateManager", renderer)
+        self.assertIn("[self.stateManager moveSelection:direction]", renderer)
+        self.assertIn("selectedSnapshotIdentifier", state)
+        self.assertIn("containsObject:self.selectedSnapshotIdentifier", state)
+        self.assertNotIn("currentIndex", renderer)
+
+    def test_renderer_relayouts_to_current_screen_and_safe_area(self):
+        renderer = (ROOT / "Sources/NIIslandView.m").read_text()
+        self.assertIn("self.window.frame = UIScreen.mainScreen.bounds", renderer)
+        self.assertIn("self.window.safeAreaInsets", renderer)
+        self.assertIn("UIAccessibilityIsReduceMotionEnabled()", renderer)
+
     def test_unknown_models_fail_closed_and_native_models_are_excluded(self):
         source = (ROOT / "Sources/NICompatibility.m").read_text()
         self.assertIn("nativeIslandModels", source)
@@ -98,6 +148,14 @@ class ProjectStructureTests(unittest.TestCase):
         self.assertIn('removeObserver:self forKeyPath:@"outputVolume"', source)
         self.assertIn('context == NIAudioVolumeContext', source)
         self.assertIn("dispatch_async(dispatch_get_main_queue(), ^{ [self refreshAndNotify]; });", source)
+
+    def test_provider_reconciles_timer_on_wake_and_recognizes_external_routes(self):
+        source = (ROOT / "Sources/NIModuleProvider.m").read_text()
+        self.assertIn("UIApplicationDidBecomeActiveNotification", source)
+        self.assertIn("UIApplicationSignificantTimeChangeNotification", source)
+        self.assertIn("NITimerLogicIsExpired(state, NSDate.date.timeIntervalSince1970)", source)
+        self.assertIn("AVAudioSessionPortAirPlay", source)
+        self.assertIn("AVAudioSessionPortCarAudio", source)
 
     def test_sources_have_no_placeholder_markers(self):
         source_files = list((ROOT / "Sources").glob("*.m")) + list((ROOT / "Sources").glob("*.h"))

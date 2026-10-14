@@ -26,9 +26,9 @@ Phiên bản mã nguồn hiện đặt mục tiêu iOS 15.0 trở lên. Một s�
 | Rootless | Build/package đã xác minh trong container Ubuntu; chưa cài trên thiết bị |
 | iOS 15 trở lên | Mức phiên bản mục tiêu; chưa xác minh tương thích thực tế theo từng phiên bản |
 
-Repo hiện có gói `.deb` Rootful và Rootless đã build/kiểm tra cấu trúc trong container. Chúng chưa được cài hoặc kiểm thử trên iPhone. File ZIP là source archive, không phải gói cài đặt.
+Release `v1.0.1` có gói Rootful và Rootless đã được build/kiểm tra cấu trúc trong CI. Các thay đổi source `1.1.0` chưa phải package phát hành cho tới khi workflow release build và kiểm tra xong. Không package nào được cài hoặc kiểm thử trên iPhone.
 
-Phiên bản source hiện tại là `1.0.1`. Build trong container Linux đã tạo gói Rootful và Rootless với Theos, iPhoneOS 16.5 SDK và cross-compiler clang 19; test runtime trên iPhone chưa thực hiện.
+Phiên bản source đang phát triển là `1.1.0`. Bản này bổ sung state manager cho chế độ hiển thị, cập nhật volume theo sự kiện, khôi phục trạng thái timer khi ứng dụng hoạt động lại và nhận diện một số tuyến âm thanh ngoài. Việc kiểm thử runtime trên iPhone vẫn chưa thực hiện.
 
 ## Trước khi cài đặt
 
@@ -39,10 +39,10 @@ Phiên bản source hiện tại là `1.0.1`. Build trong container Linux đã t
 
 ## Cài đặt
 
-Các gói build cục bộ nằm trong `packages/`; đây chưa phải bản phát hành đã thử trên thiết bị. Khi cài trên thiết bị thử nghiệm:
+Gói cài đặt chỉ được cung cấp qua release có checksum sau khi workflow build và kiểm tra cấu trúc hoàn tất; đây không phải chứng nhận đã thử trên thiết bị. Khi cài trên thiết bị thử nghiệm:
 
 1. Xác định jailbreak của thiết bị là Rootful hay Rootless.
-2. Chọn đúng gói `com.neoisland.tweak_1.0.1_iphoneos-arm.deb` (Rootful) hoặc `com.neoisland.tweak_1.0.1_iphoneos-arm64.deb` (Rootless); không cài gói của loại jailbreak còn lại.
+2. Chọn đúng gói `com.neoisland.tweak_1.1.0_iphoneos-arm.deb` (Rootful) hoặc `com.neoisland.tweak_1.1.0_iphoneos-arm64.deb` (Rootless); không cài gói của loại jailbreak còn lại.
 3. Chuyển gói vào thiết bị và cài bằng trình quản lý gói jailbreak; xác nhận các dependency được yêu cầu.
 4. Respring nếu trình quản lý gói yêu cầu hoặc nếu giao diện chưa cập nhật.
 5. Mở ứng dụng **Cài đặt** và chọn **Dynamic Island**.
@@ -51,7 +51,7 @@ Các gói build cục bộ nằm trong `packages/`; đây chưa phải bản ph�
 
 ### Pill và thao tác
 
-Chạm hoặc nhấn giữ pill để mở rộng/thu gọn. Khi có nhiều trạng thái khả dụng, vuốt ngang để chuyển module. Pill tự thu gọn theo thời gian đã đặt; đặt thời gian tự thu gọn về `0` để tắt hành vi này. Cử chỉ chỉ được xử lý trong vùng pill.
+Chạm hoặc nhấn giữ pill để mở rộng/thu gọn. Renderer chọn compact, expanded, minimal hoặc activity từ state và dữ liệu module; notification mode chỉ có giao diện state, chưa có provider notification. Khi có nhiều trạng thái khả dụng, vuốt ngang để chuyển theo định danh module ổn định, tránh nhảy selection khi dữ liệu refresh. Pill tự thu gọn theo thời gian đã đặt; đặt thời gian tự thu gọn về `0` để tắt hành vi này. Cử chỉ chỉ được xử lý trong vùng pill.
 
 ### Module
 
@@ -65,7 +65,7 @@ Trong **Cài đặt > Dynamic Island**, bật hoặc tắt từng module:
 | Cảnh báo pin 20% | Khi mức pin được quan sát chuyển từ trên 20% xuống 20% hoặc thấp hơn, pill hiển thị nhắc nhở trong khoảng 8 giây. Cảnh báo được khóa lặp cho tới khi pin vượt 22%. Bật tweak khi pin đã thấp không tự tạo cảnh báo chuyển ngưỡng. Đây là nhắc nhở trong pill, không phải thông báo iOS. |
 | Âm lượng | Chỉ đọc mức âm lượng đầu ra; không thay đổi âm lượng. Thay đổi âm lượng được theo dõi để làm mới module. |
 | Kết nối mạng | Hiển thị trạng thái reachability tổng quát; không xác định chính xác tên Wi-Fi hoặc loại kết nối trong mọi trường hợp. Khi không có dữ liệu, module bị ẩn. |
-| Tai nghe/thiết bị âm thanh | Hiển thị tên đầu ra Bluetooth hoặc tai nghe có dây khi nhận diện được. Không đọc mức pin từng bên AirPods. |
+| Tuyến âm thanh | Hiển thị tuyến Bluetooth, tai nghe có dây, AirPlay hoặc car audio khi hệ thống cung cấp. Không đọc mức pin từng bên AirPods. |
 | Hẹn giờ Neo Island | Đặt thời lượng rồi chọn **Start timer**. Có thể tạm dừng, tiếp tục hoặc hủy trong Cài đặt; khi pill mở rộng có thể tạm dừng/tiếp tục. Hẹn giờ có mốc thời gian lưu qua respring nhưng không kết nối ứng dụng Đồng hồ, không phát chuông báo và có thể bị ảnh hưởng nếu đổi giờ hệ thống. |
 | Văn bản tùy chỉnh | Bật module và nhập nội dung. Nội dung trống sẽ không hiển thị. |
 | Pill nhàn rỗi | **Always show idle pill** giữ pill trên màn hình ngay cả khi không có module dữ liệu. Tắt để ẩn pill khi không có hoạt động. |
@@ -150,7 +150,8 @@ Dự án sử dụng giấy phép MIT theo tệp [LICENSE](LICENSE). Tệp giấ
 
 ## Phiên bản và hỗ trợ
 
-- Phiên bản ghi trong metadata gói: **1.0.1**.
+- Phiên bản source: **1.1.0**.
+- Nhật ký thay đổi: **1.1.0** — tách quản lý trạng thái khỏi renderer, thêm các mode compact/expanded/minimal/activity/notification, chuyển lựa chọn module sang định danh ổn định, thêm material và kích thước theo mode, làm mới volume theo sự kiện, khôi phục timer theo sự kiện foreground/đổi giờ và nhận diện tuyến AirPlay/car audio.
 - Nhật ký thay đổi: **1.0.1** — sửa timer tự dừng tại deadline, hủy state khi tắt module, sửa lỗi compile Darwin notification/KVC/UI, chuẩn hóa quyền package staging và thêm CI build Rootful/Rootless.
 - Rootful và Rootless: build/package đã xác minh cục bộ trên Ubuntu 24.04 bằng iPhoneOS 16.5 SDK; chưa cài lên thiết bị.
 - Tương thích runtime theo thiết bị/iOS: **chưa xác minh**. Target deployment là iOS 15.0; không có tuyên bố thiết bị/iOS đã test.

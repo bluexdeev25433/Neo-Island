@@ -106,6 +106,7 @@ static NSString * const NISettingsChanged = @"com.neoisland.configuration.change
 
 - (id)readPreferenceValue:(PSSpecifier *)specifier {
     NSString *key = [specifier propertyForKey:@"key"];
+    if (![key isKindOfClass:NSString.class] || key.length == 0) return nil;
     id value = [self.settings objectForKey:key];
     if (!value) value = [specifier propertyForKey:@"default"];
     NSNumber *minimum = [specifier propertyForKey:@"min"];
@@ -118,7 +119,7 @@ static NSString * const NISettingsChanged = @"com.neoisland.configuration.change
 
 - (void)setPreferenceValue:(id)value specifier:(PSSpecifier *)specifier {
     NSString *key = [specifier propertyForKey:@"key"];
-    if (!key || !value) return;
+    if (![key isKindOfClass:NSString.class] || key.length == 0 || !value || !self.settings) return;
     NSNumber *minimum = [specifier propertyForKey:@"min"];
     NSNumber *maximum = [specifier propertyForKey:@"max"];
     if ([value isKindOfClass:NSNumber.class] && minimum && maximum) {
@@ -135,6 +136,7 @@ static NSString * const NISettingsChanged = @"com.neoisland.configuration.change
 }
 
 - (void)sendTimerCommand:(NSInteger)command {
+    if (!self.settings || command < 1 || command > 4) return;
     if (command == 1) [self.settings setBool:YES forKey:@"TimerEnabled"];
     [self.settings setInteger:command forKey:@"TimerCommand"];
     [self.settings synchronize];
@@ -148,6 +150,7 @@ static NSString * const NISettingsChanged = @"com.neoisland.configuration.change
 
 - (void)restoreDefaults:(PSSpecifier *)specifier {
     (void)specifier;
+    if (!self.settings) return;
     NSDictionary *defaults = @{
         @"Enabled": @YES, @"AlwaysShowIdle": @NO, @"LockScreenEnabled": @NO,
         @"ShowSensitiveOnLockScreen": @NO, @"ForceOverlay": @NO,
