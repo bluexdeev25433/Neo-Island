@@ -55,8 +55,10 @@ class ProjectStructureTests(unittest.TestCase):
         self.assertIn('id="sileo-button"', website)
         self.assertIn('id="sileo-button" href="#" hidden', website)
         self.assertIn('crypto.subtle.digest("SHA-256"', website)
+        self.assertIn("main/binary-${architecture}/Packages`", website)
         self.assertIn("verifyIndex(\"iphoneos-arm\", releaseText)", website)
         self.assertIn("verifyIndex(\"iphoneos-arm64\", releaseText)", website)
+        self.assertNotIn("DecompressionStream", website)
 
     def test_makefiles_reference_existing_sources(self):
         root_make = (ROOT / "Makefile").read_text()

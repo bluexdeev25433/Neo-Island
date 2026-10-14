@@ -236,7 +236,7 @@
       </div>
       <div class="distribution">
         <article><h3>Direct downloads</h3><p>Release assets are linked only when GitHub reports the matching v1.1.0 files.</p><div id="download-links"><a class="asset-link" href="https://github.com/bluexdeev25433/Neo-Island/releases">Browse all GitHub releases ↗</a></div></article>
-        <article><h3>Sileo source</h3><p>The source link appears only after the published APT Release and both compressed package indexes pass hash and package checks.</p><a id="sileo-source-link" class="text-link" href="#" hidden>Open the Neo Island source in Sileo ↗</a></article>
+        <article><h3>Sileo source</h3><p>The source link appears only after the published APT Release and both package indexes pass hash and package checks.</p><a id="sileo-source-link" class="text-link" href="#" hidden>Open the Neo Island source in Sileo ↗</a></article>
       </div>
     </section>
   </main>
@@ -270,16 +270,16 @@
     }
 
     async function verifyIndex(architecture, releaseText) {
-      const path = `main/binary-${architecture}/Packages.gz`;
+      const path = `main/binary-${architecture}/Packages`;
       const response = await fetch(new URL(`dists/stable/${path}`, repoBase), {cache: "no-store"});
       if (!response.ok) return false;
       const bytes = await response.arrayBuffer();
       const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), byte => byte.toString(16).padStart(2, "0")).join("");
       const record = releaseText.split("\n").find(line => line.trim().endsWith(` ${path}`));
       if (!record || !record.trim().startsWith(digest + " ")) return false;
-      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
-      const packages = await new Response(stream).text();
-      return expectedPackages.every(value => packages.includes(value));
+      const packages = new TextDecoder().decode(bytes);
+      const requiredFields = [...expectedPackages, `Architecture: ${architecture}`];
+      return requiredFields.every(value => packages.includes(value));
     }
 
     async function checkRepository() {
