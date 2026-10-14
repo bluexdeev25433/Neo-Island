@@ -42,6 +42,7 @@ class ProjectStructureTests(unittest.TestCase):
         self.assertIn("SHA256SUMS", workflow)
         self.assertIn("actions/upload-pages-artifact", workflow)
         self.assertIn("actions/deploy-pages", workflow)
+        self.assertLess(workflow.index("actions/deploy-pages@v4"), workflow.index("gh release create"))
 
     def test_website_hides_sileo_link_until_repository_indexes_validate(self):
         website = (ROOT / "docs/index.html").read_text()

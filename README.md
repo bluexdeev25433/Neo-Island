@@ -153,6 +153,6 @@ Dự án sử dụng giấy phép MIT theo tệp [LICENSE](LICENSE). Tệp giấ
 - Phiên bản source: **1.1.0**.
 - Nhật ký thay đổi: **1.1.0** — tách quản lý trạng thái khỏi renderer, thêm các mode compact/expanded/minimal/activity/notification, chuyển lựa chọn module sang định danh ổn định, thêm material và kích thước theo mode, làm mới volume theo sự kiện, khôi phục timer theo sự kiện foreground/đổi giờ và nhận diện tuyến AirPlay/car audio.
 - Nhật ký thay đổi: **1.0.1** — sửa timer tự dừng tại deadline, hủy state khi tắt module, sửa lỗi compile Darwin notification/KVC/UI, chuẩn hóa quyền package staging và thêm CI build Rootful/Rootless.
-- Rootful và Rootless: build/package đã xác minh cục bộ trên Ubuntu 24.04 bằng iPhoneOS 16.5 SDK; chưa cài lên thiết bị.
+- Rootful và Rootless: Theos CI đã build và kiểm tra metadata, install paths, cùng arm64/arm64e cho source `1.1.0`; chưa cài lên thiết bị.
 - Tương thích runtime theo thiết bị/iOS: **chưa xác minh**. Target deployment là iOS 15.0; không có tuyên bố thiết bị/iOS đã test.
 - Chưa có kênh hỗ trợ chính thức được cung cấp. Các chức năng chưa hỗ trợ được liệt kê trong mục [Sử dụng](#sử-dụng).
