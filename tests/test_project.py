@@ -92,6 +92,13 @@ class ProjectStructureTests(unittest.TestCase):
         self.assertIn("legacyOverlayModels", source)
         self.assertIn("return [legacyOverlayModels containsObject:self.machineIdentifier]", source)
 
+    def test_volume_changes_refresh_snapshots_and_observer_is_removed(self):
+        source = (ROOT / "Sources/NIModuleProvider.m").read_text()
+        self.assertIn('addObserver:self forKeyPath:@"outputVolume"', source)
+        self.assertIn('removeObserver:self forKeyPath:@"outputVolume"', source)
+        self.assertIn('context == NIAudioVolumeContext', source)
+        self.assertIn("dispatch_async(dispatch_get_main_queue(), ^{ [self refreshAndNotify]; });", source)
+
     def test_sources_have_no_placeholder_markers(self):
         source_files = list((ROOT / "Sources").glob("*.m")) + list((ROOT / "Sources").glob("*.h"))
         combined = "\n".join(path.read_text() for path in source_files)

@@ -8,6 +8,7 @@
 #import <netinet/in.h>
 
 static void NIReachabilityChanged(SCNetworkReachabilityRef target, SCNetworkReachabilityFlags flags, void *info);
+static void *NIAudioVolumeContext = &NIAudioVolumeContext;
 
 @interface NIModuleProvider ()
 @property (nonatomic, copy, readwrite) NSArray<NSDictionary<NSString *, id> *> *snapshots;
@@ -18,6 +19,7 @@ static void NIReachabilityChanged(SCNetworkReachabilityRef target, SCNetworkReac
 @property (nonatomic) BOOL monitoringBattery;
 @property (nonatomic) BOOL monitoringMusic;
 @property (nonatomic) BOOL monitoringAudioRoute;
+@property (nonatomic) BOOL monitoringVolume;
 @property (nonatomic) BOOL monitoringNetwork;
 - (void)updateObserversForConfiguration;
 - (void)refreshAndNotify;
@@ -62,6 +64,9 @@ static void NIReachabilityChanged(SCNetworkReachabilityRef target, SCNetworkReac
     [self.batteryNoticeTimer invalidate];
     [NSNotificationCenter.defaultCenter removeObserver:self];
     if (self.monitoringMusic) [MPMusicPlayerController.systemMusicPlayer endGeneratingPlaybackNotifications];
+    if (self.monitoringVolume) {
+        [AVAudioSession.sharedInstance removeObserver:self forKeyPath:@"outputVolume" context:NIAudioVolumeContext];
+    }
     if (self.monitoringBattery) UIDevice.currentDevice.batteryMonitoringEnabled = NO;
     if (self.reachability) {
         SCNetworkReachabilityUnscheduleFromRunLoop(self.reachability, CFRunLoopGetMain(), kCFRunLoopCommonModes);
@@ -72,6 +77,17 @@ static void NIReachabilityChanged(SCNetworkReachabilityRef target, SCNetworkReac
 - (void)systemStateChanged:(NSNotification *)notification {
     (void)notification;
     [self refreshAndNotify];
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object
+    change:(NSDictionary<NSKeyValueChangeKey, id> *)change context:(void *)context {
+    (void)object;
+    (void)change;
+    if (context == NIAudioVolumeContext && [keyPath isEqualToString:@"outputVolume"]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [self refreshAndNotify]; });
+        return;
+    }
+    [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
 }
 
 - (void)batteryStateChanged:(NSNotification *)notification {
@@ -287,6 +303,17 @@ static void NIReachabilityChanged(SCNetworkReachabilityRef target, SCNetworkReac
         if (wantsRoute) [center addObserver:self selector:@selector(systemStateChanged:) name:AVAudioSessionRouteChangeNotification object:AVAudioSession.sharedInstance];
         else [center removeObserver:self name:AVAudioSessionRouteChangeNotification object:AVAudioSession.sharedInstance];
         self.monitoringAudioRoute = wantsRoute;
+    }
+    BOOL wantsVolume = [configuration boolForKey:@"VolumeEnabled"];
+    if (wantsVolume != self.monitoringVolume) {
+        if (wantsVolume) {
+            [AVAudioSession.sharedInstance addObserver:self forKeyPath:@"outputVolume"
+                options:0 context:NIAudioVolumeContext];
+        } else {
+            [AVAudioSession.sharedInstance removeObserver:self forKeyPath:@"outputVolume"
+                context:NIAudioVolumeContext];
+        }
+        self.monitoringVolume = wantsVolume;
     }
     BOOL wantsNetwork = [configuration boolForKey:@"NetworkEnabled"];
     if (wantsNetwork && !self.reachability) {

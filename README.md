@@ -63,7 +63,7 @@ Trong **Cài đặt > Dynamic Island**, bật hoặc tắt từng module:
 | Music Pill | Là trạng thái nhạc trong pill mô phỏng, không phải Dynamic Island gốc. Không có metadata thì module không hiện. |
 | Pin | Hiển thị phần trăm và trạng thái sạc khi thiết bị cung cấp dữ liệu. |
 | Cảnh báo pin 20% | Khi mức pin được quan sát chuyển từ trên 20% xuống 20% hoặc thấp hơn, pill hiển thị nhắc nhở trong khoảng 8 giây. Cảnh báo được khóa lặp cho tới khi pin vượt 22%. Bật tweak khi pin đã thấp không tự tạo cảnh báo chuyển ngưỡng. Đây là nhắc nhở trong pill, không phải thông báo iOS. |
-| Âm lượng | Chỉ đọc mức âm lượng đầu ra; không thay đổi âm lượng. Thời điểm cập nhật có thể phụ thuộc lần làm mới trạng thái tiếp theo. |
+| Âm lượng | Chỉ đọc mức âm lượng đầu ra; không thay đổi âm lượng. Thay đổi âm lượng được theo dõi để làm mới module. |
 | Kết nối mạng | Hiển thị trạng thái reachability tổng quát; không xác định chính xác tên Wi-Fi hoặc loại kết nối trong mọi trường hợp. Khi không có dữ liệu, module bị ẩn. |
 | Tai nghe/thiết bị âm thanh | Hiển thị tên đầu ra Bluetooth hoặc tai nghe có dây khi nhận diện được. Không đọc mức pin từng bên AirPods. |
 | Hẹn giờ Neo Island | Đặt thời lượng rồi chọn **Start timer**. Có thể tạm dừng, tiếp tục hoặc hủy trong Cài đặt; khi pill mở rộng có thể tạm dừng/tiếp tục. Hẹn giờ có mốc thời gian lưu qua respring nhưng không kết nối ứng dụng Đồng hồ, không phát chuông báo và có thể bị ảnh hưởng nếu đổi giờ hệ thống. |
