@@ -181,7 +181,7 @@ jobs:
               release-assets/SHA256SUMS \
               --clobber
           else
-            gh release create "v1.1.0" --target "v1.1.0" \
+            gh release create "v1.1.0" --target main \
               release-assets/NeoIsland-1.1.0-Rootful.deb \
               release-assets/NeoIsland-1.1.0-Rootless.deb \
               release-assets/NeoIsland-source-1.1.0.zip \
