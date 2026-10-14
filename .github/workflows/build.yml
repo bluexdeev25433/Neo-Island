@@ -18,10 +18,14 @@ jobs:
       fail-fast: false
       matrix:
         scheme: [rootful, rootless]
-    env:
-      THEOS: ${{ runner.temp }}/theos
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install actionlint
+        run: |
+          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
       - name: Install host dependencies
         run: |
@@ -29,6 +33,8 @@ jobs:
           sudo apt-get install -y build-essential fakeroot rsync curl perl zip git libxml2-dev libtinfo6 xz-utils dpkg-dev
 
       - name: Install Theos, iOS SDK, cross compiler, and ldid
+        env:
+          THEOS: ${{ runner.temp }}/theos
         run: |
           git clone --depth=1 --recursive https://github.com/theos/theos.git "$THEOS"
           "$THEOS/bin/install-sdk" iPhoneOS16.5
@@ -44,8 +50,11 @@ jobs:
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
           git diff --check
+          actionlint .github/workflows/build.yml
 
       - name: Build package
+        env:
+          THEOS: ${{ runner.temp }}/theos
         run: |
           umask 022
           set -o pipefail
@@ -56,6 +65,8 @@ jobs:
           fi
 
       - name: Validate package metadata and contents
+        env:
+          THEOS: ${{ runner.temp }}/theos
         run: |
           set -euo pipefail
           package=$(find packages -maxdepth 1 -type f -name '*.deb' -print -quit)
