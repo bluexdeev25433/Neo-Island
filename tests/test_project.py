@@ -48,6 +48,7 @@ class ProjectStructureTests(unittest.TestCase):
         self.assertIn('git archive --format=zip --prefix=NeoIsland-${VERSION}/ "v${VERSION}"', workflow)
         self.assertIn("fetch-depth: 0", workflow)
         self.assertIn('gh release upload "v1.1.0"', workflow)
+        self.assertIn('gh release create "v1.1.0" --target main', workflow)
 
     def test_website_hides_sileo_link_until_repository_indexes_validate(self):
         website = (ROOT / "docs/index.html").read_text()
