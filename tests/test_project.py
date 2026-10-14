@@ -36,9 +36,9 @@ class ProjectStructureTests(unittest.TestCase):
 
     def test_release_workflow_builds_packages_and_generates_verified_apt_repo(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
-        self.assertIn('tags: ["v1.1.0"]', workflow)
+        self.assertIn('paths: [".github/release-requests/v1.1.0"]', workflow)
         self.assertIn("workflow_dispatch:", workflow)
-        self.assertIn("if: github.event_name == 'workflow_dispatch'", workflow)
+        self.assertIn("if: github.ref == 'refs/heads/main'", workflow)
         self.assertIn("dpkg-scanpackages", workflow)
         self.assertIn("apt-ftparchive release", workflow)
         self.assertIn("SHA256SUMS", workflow)

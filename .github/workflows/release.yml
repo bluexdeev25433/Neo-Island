@@ -2,7 +2,8 @@ name: Build and publish Neo Island 1.1.0
 
 on:
   push:
-    tags: ["v1.1.0"]
+    branches: ["main"]
+    paths: [".github/release-requests/v1.1.0"]
   workflow_dispatch:
 
 permissions:
@@ -92,7 +93,7 @@ jobs:
 
   publish:
     name: Publish release and APT repository
-    if: github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     needs: build
     runs-on: ubuntu-24.04
     permissions:
