@@ -150,7 +150,6 @@
 
 - (void)renderCurrentSnapshotAnimated:(BOOL)animated {
     NSDictionary *snapshot = [self currentSnapshot];
-    NIIslandMode mode = self.stateManager.mode;
     self.pill.hidden = !self.stateManager.shouldShowContent;
     if (self.pill.hidden) return;
 
@@ -257,7 +256,7 @@
         self.symbolView.hidden = minimal ? NO : self.artworkView.image != nil;
         self.titleLabel.frame = CGRectMake(textX, expanded ? 20 : 0, textWidth, expanded ? 22 : height);
         self.subtitleLabel.frame = CGRectMake(textX, 44, textWidth, 16);
-        self.subtitleLabel.hidden = !expanded && mode != NIIslandModeNotification || self.subtitleLabel.text.length == 0;
+        self.subtitleLabel.hidden = ((!expanded && mode != NIIslandModeNotification) || self.subtitleLabel.text.length == 0);
         self.titleLabel.font = [UIFont systemFontOfSize:(expanded ? 14 : 13) * scale weight:UIFontWeightSemibold];
         self.subtitleLabel.font = [UIFont systemFontOfSize:10 * scale weight:UIFontWeightRegular];
         self.previousButton.frame = CGRectMake(width - 96, height - 34, 24, 24);
